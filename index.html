@@ -1,52 +1,62 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Kuis Balapan Mobil</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Balapan Bilangan Cacah — Edukatif</title>
+
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.267.0/dist/lucide.min.js"></script>
+
   <style>
-    .car-icon {
-      position: absolute;
-      top: 50%;
-      transform: translateY(-50%) scaleX(-1);
-      transition: right 600ms ease;
-      font-size: 32px;
-      right: 0;
+    .track { background: linear-gradient(90deg,#fff 0%, #fff 100%); border-radius: 8px; }
+    .car-wrap { position: relative; height: 56px; }
+    .car-icon { position: absolute; top: 50%; transform: translateY(-50%); transition: left 600ms ease; }
+    .card { background: white; border-radius: 12px; box-shadow: 0 6px 18px rgba(0,0,0,0.08); }
+    #scoreModal {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+      display: none; align-items: center; justify-content: center; z-index: 50;
     }
   </style>
 </head>
-<body class="bg-yellow-50 flex flex-col items-center justify-center min-h-screen">
+<body class="bg-yellow-50 min-h-screen flex items-center justify-center p-6">
 
-  <!-- Judul -->
-  <h1 class="text-3xl font-bold mb-4 text-yellow-700">🏁 Kuis Balapan Mobil</h1>
+  <div class="w-full max-w-4xl">
+    <!-- Header -->
+    <header class="flex items-center justify-between mb-6">
+      <div class="flex items-center gap-3">
+        <div class="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow">
+          <svg data-lucide="book" class="lucide" width="20" height="20"></svg>
+        </div>
+        <div>
+          <h1 class="text-2xl font-semibold text-gray-800">Balapan Bilangan Cacah</h1>
+          <p class="text-sm text-gray-600">Belajar sambil bermain — jawab soal, majukan mobilmu</p>
+        </div>
+      </div>
+      <button id="btnCreate" class="bg-white text-yellow-600 font-semibold px-4 py-2 rounded shadow">Buat Room</button>
+    </header>
 
-  <!-- Area lintasan -->
-  <div id="track" class="w-full max-w-3xl bg-gray-200 h-24 rounded-lg relative overflow-hidden mb-4"></div>
+    <!-- Main app area -->
+    <main id="app" class="card p-6"></main>
 
-  <!-- Area soal -->
-  <div id="quizArea" class="bg-white rounded-lg shadow-lg p-4 text-center w-80">
-    <p id="questionText" class="text-lg font-semibold mb-2">Soal akan muncul di sini</p>
-    <input id="answerInput" type="number" class="border rounded p-2 w-full mb-3" placeholder="Jawaban kamu..." />
-    <button id="submitBtn" class="bg-yellow-600 text-white px-4 py-2 rounded w-full">Jawab</button>
+    <footer class="mt-4 text-xs text-gray-500 text-center">
+      Desain edukatif • Tema: Kuning & Putih • Maks 5 pemain per room
+    </footer>
   </div>
 
   <!-- Modal skor -->
-  <div id="scoreModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center">
-    <div class="bg-white rounded-lg shadow-lg p-6 text-center max-w-sm w-full">
-      <h2 class="text-xl font-bold text-gray-800 mb-2">🎉 Kuis Selesai!</h2>
-      <p class="text-gray-700 mb-4" id="scoreText">Skor kamu: 0</p>
-      <button id="retryBtn" class="bg-yellow-600 text-white px-4 py-2 rounded">Coba Lagi</button>
+  <div id="scoreModal">
+    <div class="bg-white p-6 rounded-xl shadow-lg w-80 text-center">
+      <h2 class="text-lg font-semibold text-gray-800 mb-2">Permainan Selesai 🎉</h2>
+      <div id="scoreList" class="text-sm text-gray-700 mb-4"></div>
+      <button id="closeModal" class="bg-yellow-600 text-white px-4 py-2 rounded">Kembali ke Lobby</button>
     </div>
   </div>
 
   <script type="module">
-    // Import Firebase modular
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-    import { getDatabase, ref, set, get, update, onValue, runTransaction } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
-    import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-analytics.js";
+    import { getDatabase, ref, set, get, onValue, update, runTransaction } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
 
-    // 🔥 Konfigurasi Firebase kamu
     const firebaseConfig = {
       apiKey: "AIzaSyAfHIXrnD9iFZx03ASospR-INapp6ImjUM",
       authDomain: "balap-50624.firebaseapp.com",
@@ -58,134 +68,182 @@
       measurementId: "G-4NT9V14N92"
     };
 
-    // Inisialisasi Firebase
     const app = initializeApp(firebaseConfig);
-    const analytics = getAnalytics(app);
     const db = getDatabase(app);
 
-    // 🧩 Konstanta permainan
+    const appEl = document.getElementById("app");
+    const btnCreate = document.getElementById("btnCreate");
+    const modal = document.getElementById("scoreModal");
+    const closeModalBtn = document.getElementById("closeModal");
+    const scoreListEl = document.getElementById("scoreList");
+
+    let isHost = false;
+    let roomId = new URLSearchParams(window.location.search).get("room");
+    let playerId = Math.random().toString(36).slice(2, 9);
+    let playerName = "";
+    const MAX_PLAYERS = 5;
     const QUESTIONS_PER_GAME = 5;
     const POINTS_PER_CORRECT = 1;
 
-    let playerId = "player_" + Math.floor(Math.random() * 9999);
-    let roomId = "room1";
+    function replaceLucide(){ if(window.lucide) window.lucide.replace(); }
+    function makeRoomId(){ return Math.random().toString(36).slice(2,8); }
+    function genQuestion(){
+      const a = Math.floor(Math.random()*10);
+      const b = Math.floor(Math.random()*10);
+      return { q:`${a} + ${b} = ?`, a:a+b };
+    }
+    function scoreToPercent(s){ return Math.min(92, Math.round((s/QUESTIONS_PER_GAME)*92)) + "%"; }
 
-    // 🧮 Fungsi buat soal acak
-    function genQuestion() {
-      const a = Math.floor(Math.random() * 9) + 1;
-      const b = Math.floor(Math.random() * 9) + 1;
-      return { q: `${a} + ${b} = ?`, a: a + b };
+    // === UI ===
+    function renderLanding(){
+      appEl.innerHTML = `
+      <div class="grid md:grid-cols-2 gap-6">
+        <div class="p-4">
+          <h2 class="text-lg font-semibold text-gray-800 mb-2">Masuk Room</h2>
+          <input id="inputRoom" class="p-2 border rounded w-full mb-2" placeholder="Room ID" value="${roomId||''}"/>
+          <input id="inputName" class="p-2 border rounded w-full mb-3" placeholder="Nama Kamu"/>
+          <div class="flex gap-2">
+            <button id="joinBtn" class="bg-yellow-600 text-white flex-1 py-2 rounded">Gabung</button>
+            <button id="hostBtn" class="bg-white border border-yellow-600 text-yellow-600 flex-1 py-2 rounded">Buat Room</button>
+          </div>
+        </div>
+        <div class="p-4 bg-yellow-50 rounded">
+          <p class="text-sm text-gray-700">Jawab 5 soal dengan benar secepat mungkin! Setiap jawaban benar memajukan mobilmu 🚗💨</p>
+        </div>
+      </div>`;
+      replaceLucide();
+      document.getElementById("joinBtn").onclick = joinAsPlayer;
+      document.getElementById("hostBtn").onclick = createRoomAsHost;
     }
 
-    // 🚗 Konversi skor ke posisi mobil (kanan ke kiri)
-    function scoreToPercent(score) {
-      const max = QUESTIONS_PER_GAME;
-      const pct = Math.min(92, Math.round((score / max) * 92));
-      return (92 - pct) + "%"; // makin besar skor, makin ke kiri
+    function renderRoomWaiting(room){
+      const players = room.players || {};
+      const list = Object.values(players).map(p=>`<div class="p-2 border-b">${p.name} (${p.score||0})</div>`).join('');
+      appEl.innerHTML = `
+        <h2 class="font-semibold text-lg mb-2">Room: <span class="text-yellow-600">${roomId}</span></h2>
+        <div class="border rounded mb-3">${list||'<div class="p-2 text-gray-500">Belum ada pemain</div>'}</div>
+        ${isHost?'<button id="startBtn" class="bg-yellow-600 text-white px-4 py-2 rounded">Mulai Game</button>':''}
+        <button id="leaveBtn" class="border px-3 py-2 rounded mt-2">Keluar</button>
+      `;
+      if(isHost) document.getElementById("startBtn").onclick=startGameAsHost;
+      document.getElementById("leaveBtn").onclick=leaveRoom;
     }
 
-    // 🚗 Render semua mobil di lintasan
-    async function renderTrack() {
-      const snap = await get(ref(db, `rooms/${roomId}/players`));
-      const track = document.getElementById("track");
-      track.innerHTML = "";
-
-      if (snap.exists()) {
-        const players = snap.val();
-        Object.entries(players).forEach(([id, p]) => {
-          const car = document.createElement("div");
-          car.className = "car-icon";
-          car.style.right = scoreToPercent(p.score || 0);
-          car.textContent = "🚗💨";
-          track.appendChild(car);
-        });
-      }
+    function renderGame(room){
+      const players = room.players||{};
+      const q = room.currentQuestion?.q || '';
+      appEl.innerHTML = `
+      <div class="mb-3">
+        <h2 class="text-lg font-semibold text-gray-800">Soal ${room.questionIndex+1}/${QUESTIONS_PER_GAME}</h2>
+        <p class="text-xl font-bold text-yellow-700">${q}</p>
+      </div>
+      <div class="bg-white rounded p-3 mb-4">
+        ${Object.entries(players).map(([id,p])=>`
+          <div class="car-wrap mb-3">
+            <div class="flex justify-between text-sm mb-1">
+              <div>${p.name}</div><div>Skor: ${p.score||0}</div>
+            </div>
+            <div class="relative bg-gray-100 h-10 rounded">
+              <svg data-lucide="car" width="36" height="24" class="car-icon" style="left:${scoreToPercent(p.score||0)}"></svg>
+            </div>
+          </div>`).join('')}
+      </div>
+      ${!isHost?`
+      <div class="bg-white p-3 rounded">
+        <input id="answerInput" class="p-2 border rounded w-full mb-2" placeholder="Jawaban angka">
+        <button id="sendAnswer" class="bg-yellow-600 text-white px-4 py-2 rounded w-full">Kirim Jawaban</button>
+      </div>`:`
+      <div class="text-sm text-gray-700">Kamu admin. Soal berganti otomatis.</div>`}
+      `;
+      replaceLucide();
+      if(!isHost) document.getElementById("sendAnswer").onclick=submitAnswer;
     }
 
-    // 🎲 Tampilkan soal sekarang
-    async function showQuestion() {
-      const qSnap = await get(ref(db, `rooms/${roomId}/currentQuestion`));
-      if (qSnap.exists()) {
-        document.getElementById("questionText").textContent = qSnap.val().q;
-      }
+    function showScoreModal(players){
+      const sorted = Object.values(players).sort((a,b)=>(b.score||0)-(a.score||0));
+      scoreListEl.innerHTML = sorted.map((p,i)=>`${i+1}. ${p.name} — ${p.score} poin`).join("<br>");
+      modal.style.display="flex";
     }
 
-    // 🚀 Submit jawaban pemain
-    async function submitAnswer() {
-      const val = document.getElementById("answerInput").value.trim();
-      if (val === "") return alert("Masukkan jawaban!");
-      const qSnap = await get(ref(db, `rooms/${roomId}/currentQuestion`));
-      if (!qSnap.exists()) return;
+    closeModalBtn.onclick = ()=>{
+      modal.style.display="none";
+      leaveRoom();
+    }
 
-      const current = qSnap.val();
-      const numeric = Number(val);
-      const playerRef = ref(db, `rooms/${roomId}/players/${playerId}`);
+    // === Logic ===
+    async function createRoomAsHost(){
+      const name=document.getElementById("inputName").value.trim();
+      if(!name) return alert("Isi nama admin");
+      isHost=true; playerName=name; roomId=makeRoomId();
+      await set(ref(db,`rooms/${roomId}`),{host:{id:playerId,name},started:false,players:{}});
+      history.replaceState(null,'',`?room=${roomId}`);
+      listenRoom(roomId);
+    }
 
-      if (numeric === current.a) {
-        await runTransaction(ref(db, `${playerRef.path.pieces_.join('/')}/score`), (cur) => (cur || 0) + POINTS_PER_CORRECT);
-        await runTransaction(ref(db, `${playerRef.path.pieces_.join('/')}/questionIndex`), (cur) => (cur || 0) + 1);
+    async function joinAsPlayer(){
+      const name=document.getElementById("inputName").value.trim();
+      const r=(document.getElementById("inputRoom").value||'').trim();
+      if(!name) return alert("Isi nama");
+      roomId=r||roomId; playerName=name;
+      const snap=await get(ref(db,`rooms/${roomId}`));
+      if(!snap.exists()) return alert("Room tidak ditemukan");
+      const room=snap.val(); const players=room.players||{};
+      if(Object.keys(players).length>=MAX_PLAYERS) return alert("Room penuh");
+      await update(ref(db,`rooms/${roomId}/players/${playerId}`),{name,score:0});
+      history.replaceState(null,'',`?room=${roomId}`);
+      listenRoom(roomId);
+    }
 
-        const playerSnap = await get(playerRef);
-        const playerData = playerSnap.val();
+    async function leaveRoom(){
+      if(roomId){ await set(ref(db,`rooms/${roomId}/players/${playerId}`),null); }
+      if(isHost){ await set(ref(db,`rooms/${roomId}`),null); }
+      roomId=null; isHost=false; renderLanding();
+    }
 
-        if (playerData.questionIndex >= QUESTIONS_PER_GAME) {
-          showScoreModal(playerData.score);
-          return;
+    async function startGameAsHost(){
+      const playersSnap=await get(ref(db,`rooms/${roomId}/players`));
+      if(!playersSnap.exists()) return alert("Tidak ada pemain");
+      const first=genQuestion();
+      await update(ref(db,`rooms/${roomId}`),{started:true,currentQuestion:first,questionIndex:0});
+    }
+
+    async function submitAnswer(){
+      const val=document.getElementById("answerInput").value.trim();
+      if(val==="") return;
+      const qSnap=await get(ref(db,`rooms/${roomId}`));
+      if(!qSnap.exists()) return;
+      const room=qSnap.val(); const correct=room.currentQuestion?.a;
+      if(Number(val)===correct){
+        const playerRef=ref(db,`rooms/${roomId}/players/${playerId}/score`);
+        await runTransaction(playerRef,c=>(c||0)+POINTS_PER_CORRECT);
+
+        let nextIndex=(room.questionIndex||0)+1;
+        if(nextIndex>=QUESTIONS_PER_GAME){
+          await update(ref(db,`rooms/${roomId}`),{started:false});
+        } else {
+          await update(ref(db,`rooms/${roomId}`),{questionIndex:nextIndex,currentQuestion:genQuestion()});
         }
-
-        const nq = genQuestion();
-        await set(ref(db, `rooms/${roomId}/currentQuestion`), nq);
-      } else {
-        alert("Salah, coba lagi!");
-      }
-
-      document.getElementById("answerInput").value = "";
+      } else alert("Salah, coba lagi!");
+      document.getElementById("answerInput").value="";
     }
 
-    // 🪟 Tampilkan popup skor
-    function showScoreModal(score) {
-      const modal = document.getElementById("scoreModal");
-      document.getElementById("scoreText").textContent = `Skor kamu: ${score}/${QUESTIONS_PER_GAME}`;
-      modal.classList.remove("hidden");
-      modal.classList.add("flex");
-
-      document.getElementById("retryBtn").onclick = async () => {
-        await update(ref(db, `rooms/${roomId}/players/${playerId}`), {
-          score: 0,
-          questionIndex: 0
-        });
-        modal.classList.add("hidden");
-
-        const nq = genQuestion();
-        await set(ref(db, `rooms/${roomId}/currentQuestion`), nq);
-      };
-    }
-
-    // 🚦 Inisialisasi game
-    async function init() {
-      // Batasi max 5 pemain
-      const playersSnap = await get(ref(db, `rooms/${roomId}/players`));
-      if (playersSnap.exists() && Object.keys(playersSnap.val()).length >= 5) {
-        alert("Room sudah penuh (maksimal 5 pemain)");
-        return;
-      }
-
-      await set(ref(db, `rooms/${roomId}/players/${playerId}`), {
-        name: playerId,
-        score: 0,
-        questionIndex: 0
+    function listenRoom(rid){
+      const roomRef=ref(db,`rooms/${rid}`);
+      onValue(roomRef,snap=>{
+        const data=snap.val(); if(!data){ alert("Room hilang"); return renderLanding(); }
+        if(data.host?.id===playerId) isHost=true;
+        if(!data.started){
+          if(data.questionIndex>=QUESTIONS_PER_GAME-1){
+            showScoreModal(data.players||{});
+          } else renderRoomWaiting(data);
+        } else renderGame(data);
       });
-
-      const nq = genQuestion();
-      await set(ref(db, `rooms/${roomId}/currentQuestion`), nq);
-
-      onValue(ref(db, `rooms/${roomId}/players`), renderTrack);
-      onValue(ref(db, `rooms/${roomId}/currentQuestion`), showQuestion);
     }
 
-    // Tombol event
-    document.getElementById("submitBtn").addEventListener("click", submitAnswer);
-    init();
+    btnCreate.onclick=()=>renderLanding();
+    renderLanding();
+    if(roomId) setTimeout(()=>{const el=document.getElementById("inputRoom"); if(el) el.value=roomId;},50);
+    setTimeout(()=>replaceLucide(),200);
   </script>
 </body>
 </html>
