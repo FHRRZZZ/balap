@@ -5,24 +5,25 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Balapan Bilangan Cacah — Edukatif</title>
 
-  <!-- Tailwind (dev use) -->
   <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- Lucide icons -->
   <script src="https://cdn.jsdelivr.net/npm/lucide@0.267.0/dist/lucide.min.js"></script>
 
   <style>
-    /* Minor visuals */
     .track { background: linear-gradient(90deg,#fff 0%, #fff 100%); border-radius: 8px; }
     .car-wrap { position: relative; height: 56px; }
-    .car-icon { position: absolute; top: 50%; transform: translateY(-50%); transition: left 600ms ease; }
+    .car-icon {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      transition: left 600ms ease;
+      font-size: 32px;
+    }
     .card { background: white; border-radius: 12px; box-shadow: 0 6px 18px rgba(0,0,0,0.08); }
   </style>
 </head>
 <body class="bg-yellow-50 min-h-screen flex items-center justify-center p-6">
 
   <div class="w-full max-w-4xl">
-    <!-- Header -->
     <header class="flex items-center justify-between mb-6">
       <div class="flex items-center gap-3">
         <div class="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow">
@@ -33,16 +34,12 @@
           <p class="text-sm text-gray-600">Belajar sambil bermain — jawab soal, majukan mobilmu</p>
         </div>
       </div>
-
       <div>
         <button id="btnCreate" class="bg-white text-yellow-600 font-semibold px-4 py-2 rounded shadow">Buat Room</button>
       </div>
     </header>
 
-    <!-- Main app area -->
-    <main id="app" class="card p-6">
-      <!-- Will be rendered by JS -->
-    </main>
+    <main id="app" class="card p-6"></main>
 
     <footer class="mt-4 text-xs text-gray-500 text-center">
       Desain edukatif • Tema: Kuning & Putih • Maks 5 pemain per room (admin terpisah)
@@ -50,13 +47,9 @@
   </div>
 
   <script type="module">
-    // ========== FIREBASE (modular) ==========
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-    import {
-      getDatabase, ref, set, get, onValue, update, runTransaction
-    } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+    import { getDatabase, ref, set, get, onValue, update, runTransaction } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
 
-    // --- GANTI DENGAN KONFIG FIREBASEMU (sudah kamu berikan sebelumnya) ---
     const firebaseConfig = {
       apiKey: "AIzaSyAfHIXrnD9iFZx03ASospR-INapp6ImjUM",
       authDomain: "balap-50624.firebaseapp.com",
@@ -71,7 +64,6 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    // ========== UTILS & STATE ==========
     const appEl = document.getElementById("app");
     const btnCreate = document.getElementById("btnCreate");
 
@@ -80,70 +72,54 @@
     let playerId = Math.random().toString(36).slice(2, 9);
     let playerName = "";
     const MAX_PLAYERS = 5;
-    const QUESTIONS_PER_GAME = 10;
+    const QUESTIONS_PER_GAME = 5; // 🔸 ubah jadi maksimal 5 soal
     const POINTS_PER_CORRECT = 1;
 
-    // small helper: render lucide icons
     function replaceLucide() { if (window.lucide) window.lucide.replace(); }
-
-    // generate short room id
     function makeRoomId() { return Math.random().toString(36).slice(2,8); }
-
-    // generate question object (small numbers for edukasi)
     function genQuestion() {
       const a = Math.floor(Math.random() * 10);
       const b = Math.floor(Math.random() * 10);
       return { q: `${a} + ${b} = ?`, a: a + b, seed: Date.now() };
     }
 
-    // compute left% for car from score (simple mapping)
     function scoreToPercent(score) {
-      // map up to QUESTIONS_PER_GAME points to 92% width
       const max = QUESTIONS_PER_GAME;
       const pct = Math.min(92, Math.round((score / max) * 92));
       return pct + "%";
     }
 
-    // ========== UI RENDERING ==========
+    // Landing
     function renderLanding() {
       appEl.innerHTML = `
         <div class="grid md:grid-cols-2 gap-6">
           <div class="p-4">
             <h2 class="text-lg font-semibold text-gray-800 mb-2">Masuk Room</h2>
-            <p class="text-sm text-gray-600 mb-4">Kalau sudah punya link room, tempelkan di sini atau buka link langsung.</p>
-
             <label class="text-sm text-gray-700">Room ID atau link</label>
             <input id="inputRoom" class="mt-1 p-2 border rounded w-full text-gray-800" placeholder="contoh: ab12cd" value="${roomId || ''}" />
-
             <label class="text-sm text-gray-700 mt-3 block">Nama Kamu</label>
             <input id="inputName" class="mt-1 p-2 border rounded w-full text-gray-800" placeholder="Tulis nama (contoh: Siti)" />
-
             <div class="flex gap-2 mt-4">
-              <button id="joinBtn" class="flex-1 bg-yellow-600 text-white rounded px-4 py-2 font-semibold">Gabung sebagai Pemain</button>
-              <button id="hostBtn" class="flex-1 bg-white text-yellow-600 border border-yellow-600 rounded px-4 py-2 font-semibold">Jadi Admin (Buat Room)</button>
+              <button id="joinBtn" class="flex-1 bg-yellow-600 text-white rounded px-4 py-2 font-semibold">Gabung Pemain</button>
+              <button id="hostBtn" class="flex-1 bg-white text-yellow-600 border border-yellow-600 rounded px-4 py-2 font-semibold">Jadi Admin</button>
             </div>
-
-            <p class="text-xs text-gray-500 mt-3">Catatan: Admin membuat room dan tidak ikut menjadi pemain. Maks pemain = 5.</p>
+            <p class="text-xs text-gray-500 mt-3">Maksimal 5 pemain per room.</p>
           </div>
-
           <div class="p-4 bg-yellow-50 rounded">
-            <h3 class="text-md font-semibold text-gray-800 mb-2">Cara main (singkat)</h3>
+            <h3 class="text-md font-semibold text-gray-800 mb-2">Cara main</h3>
             <ol class="list-decimal list-inside text-gray-700 text-sm space-y-1">
-              <li>Buat room (admin) lalu bagikan link ke teman.</li>
-              <li>Teman buka link → masukkan nama → tekan "Gabung".</li>
-              <li>Admin tekan "Mulai Game" saat siap.</li>
-              <li>Setiap soal sama untuk semua pemain. Jawab benar → skor naik → mobil maju.</li>
+              <li>Buat room, bagikan link ke teman.</li>
+              <li>Jawab soal dengan benar untuk maju.</li>
+              <li>Siapa paling cepat sampai akhir menang!</li>
             </ol>
           </div>
         </div>
       `;
-
       replaceLucide();
       document.getElementById("joinBtn").onclick = joinAsPlayer;
       document.getElementById("hostBtn").onclick = createRoomAsHost;
     }
 
-    // ========= ROOM VIEW (waiting) ==========
     function renderRoomWaiting(roomSnapshot) {
       const room = roomSnapshot || {};
       const players = room.players || {};
@@ -158,79 +134,51 @@
               <div class="text-xs text-gray-500">Skor: ${p.score || 0}</div>
             </div>
           </div>
-          <div class="text-xs text-gray-500">${id === playerId ? 'Anda' : ''}</div>
         </div>
       `).join("") || '<div class="text-sm text-gray-500 p-3">Belum ada pemain.</div>';
 
       appEl.innerHTML = `
         <div class="space-y-4">
-          <div class="flex items-center justify-between">
-            <div>
-              <h2 class="text-lg font-semibold text-gray-800">Room: <span class="font-mono text-yellow-600">${roomId}</span></h2>
-              <div class="text-sm text-gray-600">Admin: <span class="font-medium">${host.name || '(admin)'}</span></div>
-            </div>
-            <div class="flex items-center gap-2">
-              <input readonly class="p-2 rounded text-sm text-gray-700" value="${window.location.origin + window.location.pathname + '?room=' + roomId}" />
-              <button id="leaveBtn" class="bg-white text-gray-700 border px-3 py-2 rounded">Keluar</button>
-            </div>
-          </div>
-
+          <h2 class="text-lg font-semibold text-gray-800">Room: <span class="font-mono text-yellow-600">${roomId}</span></h2>
           <div class="p-2 bg-white rounded shadow-sm">
             <div class="text-sm text-gray-600 mb-2">Pemain (maks ${MAX_PLAYERS})</div>
             <div class="border rounded overflow-hidden">${playerListHTML}</div>
           </div>
-
           <div class="flex justify-end gap-2">
             ${isHost ? '<button id="startBtn" class="bg-yellow-600 text-white px-4 py-2 rounded font-semibold">Mulai Game</button>' : ''}
-            <button id="refreshBtn" class="bg-white text-gray-700 px-4 py-2 rounded border">Refresh</button>
           </div>
         </div>
       `;
-
       replaceLucide();
-      document.getElementById("refreshBtn").onclick = () => {}; // UI refresh happens from DB listeners
-      document.getElementById("leaveBtn").onclick = leaveRoom;
       if (isHost) document.getElementById("startBtn").onclick = startGameAsHost;
     }
 
-    // ========= GAME VIEW (playing) ==========
+    // 🔸 ubah ikon mobil pakai emoji Omoji
     function renderGameView(room) {
       const players = room.players || {};
       appEl.innerHTML = `
         <div class="space-y-4">
-          <div class="flex items-center justify-between">
-            <div>
-              <h2 class="text-lg font-semibold text-gray-800">Room: <span class="font-mono text-yellow-600">${roomId}</span></h2>
-              <div class="text-sm text-gray-600">Status: <span class="font-medium">${room.started ? 'Berlangsung' : 'Menunggu'}</span></div>
-            </div>
-            <div>
-              <div class="text-sm text-gray-700">Soal saat ini:</div>
-              <div id="currentQ" class="mt-1 text-lg font-semibold text-gray-800"></div>
-            </div>
+          <div class="flex justify-between items-center">
+            <h2 class="text-lg font-semibold text-gray-800">Room: ${roomId}</h2>
+            <div class="text-sm text-gray-700">Soal: <span id="currentQ"></span></div>
           </div>
 
           <div class="p-4 bg-white rounded track">
-            ${Object.entries(players).map(([id, p], idx) => `
+            ${Object.entries(players).map(([id, p]) => `
               <div class="mb-3 car-wrap" data-player-id="${id}">
                 <div class="flex items-center justify-between mb-2">
-                  <div class="flex items-center gap-3">
-                    <svg data-lucide="user" width="18" height="18"></svg>
-                    <div class="text-sm font-medium text-gray-800">${p.name}</div>
-                  </div>
-                  <div class="text-sm text-gray-600">Skor: <span class="score">${p.score||0}</span></div>
+                  <div class="text-sm font-medium text-gray-800">${p.name}</div>
+                  <div class="text-sm text-gray-600">Skor: <span>${p.score||0}</span></div>
                 </div>
                 <div class="relative h-12 bg-gray-100 rounded">
-                  <svg data-lucide="car" class="car-icon" width="42" height="28" style="left: ${scoreToPercent(p.score||0)}"></svg>
+                  <div class="car-icon" style="left:${scoreToPercent(p.score||0)}">🚗💨</div>
                 </div>
               </div>
             `).join('')}
           </div>
 
           <div class="grid md:grid-cols-3 gap-4">
-            <div class="md:col-span-2 bg-white p-4 rounded">
-              <div id="actionArea"></div>
-            </div>
-
+            <div class="md:col-span-2 bg-white p-4 rounded" id="actionArea"></div>
             <div class="bg-white p-4 rounded">
               <h3 class="text-sm font-semibold text-gray-800 mb-2">Papan Skor</h3>
               <div id="leaderboard" class="text-sm space-y-2"></div>
@@ -238,20 +186,15 @@
           </div>
         </div>
       `;
-
       replaceLucide();
-      // set current question text
-      const q = room.currentQuestion || { q: 'Menunggu soal...', a: null };
-      document.getElementById("currentQ").textContent = q.q;
-
-      // render action area: if player is not admin show answer input; if host show control panel
+      document.getElementById("currentQ").textContent = room.currentQuestion?.q || "-";
       const actionEl = document.getElementById("actionArea");
+
       if (isHost) {
         actionEl.innerHTML = `
-          <h3 class="text-sm font-semibold text-gray-800 mb-2">Panel Admin</h3>
-          <p class="text-sm text-gray-600 mb-3">Kamu adalah admin. Lihat skor & kontrol game.</p>
-          <button id="nextQBtn" class="bg-yellow-600 text-white px-3 py-2 rounded">Buat Soal Baru</button>
-          <button id="endBtn" class="bg-white text-gray-700 border px-3 py-2 rounded ml-2">Akhiri Game</button>
+          <h3 class="text-sm font-semibold mb-2">Panel Admin</h3>
+          <button id="nextQBtn" class="bg-yellow-600 text-white px-3 py-2 rounded">Soal Baru</button>
+          <button id="endBtn" class="bg-white border px-3 py-2 rounded ml-2">Akhiri Game</button>
         `;
         document.getElementById("nextQBtn").onclick = async () => {
           const nq = genQuestion();
@@ -262,52 +205,35 @@
         };
       } else {
         actionEl.innerHTML = `
-          <h3 class="text-sm font-semibold text-gray-800 mb-2">Jawab Soal</h3>
-          <div class="text-sm text-gray-600 mb-2">Masukkan jawaban lalu tekan Kirim.</div>
-          <input id="answerInput" class="p-2 border rounded w-full text-gray-800 mb-2" placeholder="ketik angka" />
-          <div class="flex gap-2">
-            <button id="sendAnswer" class="bg-yellow-600 text-white px-4 py-2 rounded">Kirim</button>
-            <button id="hintBtn" class="bg-white text-gray-700 border px-3 py-2 rounded">Butuh Hint</button>
-          </div>
+          <h3 class="text-sm font-semibold mb-2">Jawab Soal</h3>
+          <input id="answerInput" class="p-2 border rounded w-full mb-2" placeholder="ketik angka" />
+          <button id="sendAnswer" class="bg-yellow-600 text-white px-4 py-2 rounded">Kirim</button>
         `;
         document.getElementById("sendAnswer").onclick = submitAnswer;
-        document.getElementById("hintBtn").onclick = () => alert("Coba gunakan teknik penjumlahan sederhana (mis. 7+3 = 7 + 1 + 2).");
       }
 
-      updateLeaderboard(room.players || {});
+      updateLeaderboard(players);
     }
 
     function updateLeaderboard(players) {
       const lb = Object.entries(players || {}).sort((a,b)=> (b[1].score||0)-(a[1].score||0));
       const el = document.getElementById("leaderboard");
       if (!el) return;
-      el.innerHTML = lb.map(([id,p], idx) => `
-        <div class="flex items-center justify-between">
-          <div class="text-sm ${id===playerId ? 'font-semibold text-yellow-600' : ''}">${idx+1}. ${p.name}</div>
-          <div class="text-sm text-gray-600">${p.score||0}</div>
+      el.innerHTML = lb.map(([id,p], idx)=>`
+        <div class="flex justify-between ${id===playerId?'text-yellow-600 font-semibold':''}">
+          <div>${idx+1}. ${p.name}</div><div>${p.score||0}</div>
         </div>
       `).join('');
     }
 
-    // ========== ACTIONS: create/join/leave/start/submit ==========
     async function createRoomAsHost() {
       const nameInput = document.getElementById("inputName").value.trim();
       if (!nameInput) return alert("Isi nama admin dulu.");
       playerName = nameInput;
       isHost = true;
       roomId = makeRoomId();
-
-      // write room: host only (not as player)
-      await set(ref(db, `rooms/${roomId}`), {
-        host: { id: playerId, name: playerName },
-        started: false,
-        players: {}
-      });
-
-      // update URL
-      const url = window.location.origin + window.location.pathname + '?room=' + roomId;
-      history.replaceState(null, '', url);
-
+      await set(ref(db, `rooms/${roomId}`), { host: { id: playerId, name: playerName }, started: false, players: {} });
+      history.replaceState(null, '', '?room=' + roomId);
       listenRoom(roomId);
     }
 
@@ -316,129 +242,53 @@
       const roomInput = (document.getElementById("inputRoom").value || '').trim();
       if (!nameInput) return alert("Isi nama dulu.");
       playerName = nameInput;
-      if (!roomInput && !roomId) return alert("Masukkan Room ID atau buka link room.");
       roomId = roomInput || roomId;
-
-      // check room exists
       const snap = await get(ref(db, `rooms/${roomId}`));
       if (!snap.exists()) return alert("Room ID tidak ditemukan.");
-
       const room = snap.val();
-      const players = room.players || {};
-      if (Object.keys(players).length >= MAX_PLAYERS) return alert("Room sudah penuh (max 5 pemain).");
-
-      // add player entry
-      await update(ref(db, `rooms/${roomId}/players/${playerId}`), {
-        name: playerName,
-        score: 0
-      });
-
-      // update URL (so link is shareable)
-      const url = window.location.origin + window.location.pathname + '?room=' + roomId;
-      history.replaceState(null, '', url);
-
+      if (Object.keys(room.players||{}).length >= MAX_PLAYERS) return alert("Room penuh (maks 5).");
+      await update(ref(db, `rooms/${roomId}/players/${playerId}`), { name: playerName, score: 0 });
+      history.replaceState(null, '', '?room=' + roomId);
       listenRoom(roomId);
     }
 
-    async function leaveRoom() {
-      if (!roomId) return renderLanding();
-      // remove player if exists
-      try { await set(ref(db, `rooms/${roomId}/players/${playerId}`), null); } catch(e){}
-      // if host leaves (admin) we can delete room entirely (optional)
-      if (isHost) {
-        try { await set(ref(db, `rooms/${roomId}`), null); } catch(e){}
-      }
-      // reset
-      roomId = null;
-      isHost = false;
-      playerName = "";
-      renderLanding();
-    }
-
-    // Host starts game
     async function startGameAsHost() {
-      // minimal check: at least 1 player (you can change to >=2)
       const snap = await get(ref(db, `rooms/${roomId}/players`));
-      const cnt = snap.exists() ? Object.keys(snap.val()).length : 0;
-      if (cnt < 1) return alert("Butuh minimal 1 pemain sebelum mulai.");
-      // write started true and put initial question
+      if (!snap.exists() || Object.keys(snap.val()).length < 1) return alert("Minimal 1 pemain.");
       const initialQ = genQuestion();
       await update(ref(db, `rooms/${roomId}`), { started: true, currentQuestion: initialQ, questionIndex: 0 });
     }
 
-    // Player submits an answer
     async function submitAnswer() {
       const val = document.getElementById("answerInput").value.trim();
       if (val === "") return alert("Masukkan jawaban.");
-      // read current correct answer
       const qSnap = await get(ref(db, `rooms/${roomId}/currentQuestion`));
-      if (!qSnap.exists()) return alert("Soal belum tersedia, tunggu host.");
+      if (!qSnap.exists()) return;
       const current = qSnap.val();
       const numeric = Number(val);
-      if (isNaN(numeric)) return alert("Jawaban harus berupa angka.");
-
       if (numeric === current.a) {
-        // increment score using transaction (safer)
         const playerScoreRef = ref(db, `rooms/${roomId}/players/${playerId}/score`);
         await runTransaction(playerScoreRef, (cur) => (cur || 0) + POINTS_PER_CORRECT);
-        // after correct, update next question (any client may update; collisions unlikely)
         const nq = genQuestion();
         await set(ref(db, `rooms/${roomId}/currentQuestion`), nq);
-      } else {
-        alert("Jawaban salah. Coba lagi!");
-      }
-      // clear input
+      } else alert("Salah, coba lagi!");
       document.getElementById("answerInput").value = '';
     }
 
-    // ========== DB LISTENERS ==========
-    let roomListenerUnsub = null;
     function listenRoom(rid) {
-      // attach listener to room node
-      const roomRef = ref(db, `rooms/${rid}`);
-      if (roomListenerUnsub) { /* can't easily unsubscribe modular, but we'll just reassign listener */ }
-      onValue(roomRef, (snap) => {
+      onValue(ref(db, `rooms/${rid}`), (snap) => {
         const data = snap.val();
-        if (!data) {
-          alert('Room dihapus atau tidak tersedia.');
-          roomId = null;
-          isHost = false;
-          renderLanding();
-          return;
-        }
-
-        // if user is host, check host id match
+        if (!data) { alert('Room dihapus.'); renderLanding(); return; }
         if (data.host && data.host.id === playerId) isHost = true;
-        // update UI
-        if (!data.started) {
-          renderRoomWaiting(data);
-        } else {
-          renderGameView(data);
-        }
+        if (!data.started) renderRoomWaiting(data);
+        else renderGameView(data);
       });
     }
 
-    // ========== INIT ==========
-    // attach top create btn
-    btnCreate.onclick = () => {
-      // show create dialog quickly
-      renderLanding();
-      document.getElementById("inputName").focus();
-    };
-
-    // initial screen render
+    btnCreate.onclick = renderLanding;
     renderLanding();
-
-    // if url has room param, pre-fill and maybe auto ask for name
-    if (roomId) {
-      // show landing but prefilled
-      renderLanding();
-      const fillRoom = () => { const el = document.getElementById('inputRoom'); if(el) el.value = roomId; };
-      setTimeout(fillRoom, 50);
-    }
-
-    // ensure lucide icons are replaced
-    setTimeout(()=>replaceLucide(), 200);
+    if (roomId) setTimeout(()=>{document.getElementById('inputRoom').value = roomId;},50);
+    setTimeout(()=>replaceLucide(),200);
   </script>
 </body>
 </html>
