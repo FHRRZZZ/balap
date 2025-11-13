@@ -6,12 +6,17 @@
   <title>Balapan Bilangan Cacah — Edukatif</title>
 
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/lucide@0.267.0/dist/lucide.min.js"></script>
 
   <style>
-    .track { background: linear-gradient(90deg,#fff 0%, #fff 100%); border-radius: 8px; }
+    .track { background: #f3f4f6; border-radius: 8px; }
     .car-wrap { position: relative; height: 56px; }
-    .car-icon { position: absolute; top: 50%; transform: translateY(-50%); transition: left 600ms ease; }
+    .car-icon { 
+      position: absolute; 
+      top: 50%; 
+      transform: translateY(-50%); 
+      transition: right 600ms ease; 
+      font-size: 28px;
+    }
     .card { background: white; border-radius: 12px; box-shadow: 0 6px 18px rgba(0,0,0,0.08); }
     #scoreModal {
       position: fixed; inset: 0; background: rgba(0,0,0,0.4);
@@ -26,11 +31,11 @@
     <header class="flex items-center justify-between mb-6">
       <div class="flex items-center gap-3">
         <div class="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow">
-          <svg data-lucide="book" class="lucide" width="20" height="20"></svg>
+          📘
         </div>
         <div>
           <h1 class="text-2xl font-semibold text-gray-800">Balapan Bilangan Cacah</h1>
-          <p class="text-sm text-gray-600">Belajar sambil bermain — jawab soal, majukan mobilmu</p>
+          <p class="text-sm text-gray-600">Belajar sambil bermain — jawab soal, majukan mobilmu 🚗💨</p>
         </div>
       </div>
       <button id="btnCreate" class="bg-white text-yellow-600 font-semibold px-4 py-2 rounded shadow">Buat Room</button>
@@ -85,14 +90,17 @@
     const QUESTIONS_PER_GAME = 5;
     const POINTS_PER_CORRECT = 1;
 
-    function replaceLucide(){ if(window.lucide) window.lucide.replace(); }
     function makeRoomId(){ return Math.random().toString(36).slice(2,8); }
     function genQuestion(){
       const a = Math.floor(Math.random()*10);
       const b = Math.floor(Math.random()*10);
       return { q:`${a} + ${b} = ?`, a:a+b };
     }
-    function scoreToPercent(s){ return Math.min(92, Math.round((s/QUESTIONS_PER_GAME)*92)) + "%"; }
+    // arah dari kanan -> kiri
+    function scoreToPercent(s){ 
+      const pct = Math.min(92, Math.round((s/QUESTIONS_PER_GAME)*92));
+      return (92 - pct) + "%"; 
+    }
 
     // === UI ===
     function renderLanding(){
@@ -111,7 +119,6 @@
           <p class="text-sm text-gray-700">Jawab 5 soal dengan benar secepat mungkin! Setiap jawaban benar memajukan mobilmu 🚗💨</p>
         </div>
       </div>`;
-      replaceLucide();
       document.getElementById("joinBtn").onclick = joinAsPlayer;
       document.getElementById("hostBtn").onclick = createRoomAsHost;
     }
@@ -143,8 +150,8 @@
             <div class="flex justify-between text-sm mb-1">
               <div>${p.name}</div><div>Skor: ${p.score||0}</div>
             </div>
-            <div class="relative bg-gray-100 h-10 rounded">
-              <svg data-lucide="car" width="36" height="24" class="car-icon" style="left:${scoreToPercent(p.score||0)}"></svg>
+            <div class="relative track h-10 rounded">
+              <div class="car-icon" style="right:${scoreToPercent(p.score||0)}">🚗💨</div>
             </div>
           </div>`).join('')}
       </div>
@@ -152,10 +159,8 @@
       <div class="bg-white p-3 rounded">
         <input id="answerInput" class="p-2 border rounded w-full mb-2" placeholder="Jawaban angka">
         <button id="sendAnswer" class="bg-yellow-600 text-white px-4 py-2 rounded w-full">Kirim Jawaban</button>
-      </div>`:`
-      <div class="text-sm text-gray-700">Kamu admin. Soal berganti otomatis.</div>`}
+      </div>`:`<div class="text-sm text-gray-700">Kamu admin. Soal berganti otomatis.</div>`}
       `;
-      replaceLucide();
       if(!isHost) document.getElementById("sendAnswer").onclick=submitAnswer;
     }
 
@@ -165,10 +170,7 @@
       modal.style.display="flex";
     }
 
-    closeModalBtn.onclick = ()=>{
-      modal.style.display="none";
-      leaveRoom();
-    }
+    closeModalBtn.onclick = ()=>{ modal.style.display="none"; leaveRoom(); }
 
     // === Logic ===
     async function createRoomAsHost(){
@@ -230,7 +232,8 @@
     function listenRoom(rid){
       const roomRef=ref(db,`rooms/${rid}`);
       onValue(roomRef,snap=>{
-        const data=snap.val(); if(!data){ alert("Room hilang"); return renderLanding(); }
+        const data=snap.val(); 
+        if(!data){ alert("Room hilang"); return renderLanding(); }
         if(data.host?.id===playerId) isHost=true;
         if(!data.started){
           if(data.questionIndex>=QUESTIONS_PER_GAME-1){
@@ -242,8 +245,6 @@
 
     btnCreate.onclick=()=>renderLanding();
     renderLanding();
-    if(roomId) setTimeout(()=>{const el=document.getElementById("inputRoom"); if(el) el.value=roomId;},50);
-    setTimeout(()=>replaceLucide(),200);
   </script>
 </body>
 </html>
