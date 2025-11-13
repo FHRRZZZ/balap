@@ -1,55 +1,52 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Balapan Bilangan Cacah — Edukatif</title>
-
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kuis Balapan Mobil</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/lucide@0.267.0/dist/lucide.min.js"></script>
-
   <style>
-    .track { background: linear-gradient(90deg,#fff 0%, #fff 100%); border-radius: 8px; }
-    .car-wrap { position: relative; height: 56px; }
     .car-icon {
       position: absolute;
       top: 50%;
-      transform: translateY(-50%);
-      transition: left 600ms ease;
+      transform: translateY(-50%) scaleX(-1);
+      transition: right 600ms ease;
       font-size: 32px;
+      right: 0;
     }
-    .card { background: white; border-radius: 12px; box-shadow: 0 6px 18px rgba(0,0,0,0.08); }
   </style>
 </head>
-<body class="bg-yellow-50 min-h-screen flex items-center justify-center p-6">
+<body class="bg-yellow-50 flex flex-col items-center justify-center min-h-screen">
 
-  <div class="w-full max-w-4xl">
-    <header class="flex items-center justify-between mb-6">
-      <div class="flex items-center gap-3">
-        <div class="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow">
-          <svg data-lucide="book" class="lucide" width="20" height="20"></svg>
-        </div>
-        <div>
-          <h1 class="text-2xl font-semibold text-gray-800">Balapan Bilangan Cacah</h1>
-          <p class="text-sm text-gray-600">Belajar sambil bermain — jawab soal, majukan mobilmu</p>
-        </div>
-      </div>
-      <div>
-        <button id="btnCreate" class="bg-white text-yellow-600 font-semibold px-4 py-2 rounded shadow">Buat Room</button>
-      </div>
-    </header>
+  <!-- Judul -->
+  <h1 class="text-3xl font-bold mb-4 text-yellow-700">🏁 Kuis Balapan Mobil</h1>
 
-    <main id="app" class="card p-6"></main>
+  <!-- Area lintasan -->
+  <div id="track" class="w-full max-w-3xl bg-gray-200 h-24 rounded-lg relative overflow-hidden mb-4"></div>
 
-    <footer class="mt-4 text-xs text-gray-500 text-center">
-      Desain edukatif • Tema: Kuning & Putih • Maks 5 pemain per room (admin terpisah)
-    </footer>
+  <!-- Area soal -->
+  <div id="quizArea" class="bg-white rounded-lg shadow-lg p-4 text-center w-80">
+    <p id="questionText" class="text-lg font-semibold mb-2">Soal akan muncul di sini</p>
+    <input id="answerInput" type="number" class="border rounded p-2 w-full mb-3" placeholder="Jawaban kamu..." />
+    <button id="submitBtn" class="bg-yellow-600 text-white px-4 py-2 rounded w-full">Jawab</button>
+  </div>
+
+  <!-- Modal skor -->
+  <div id="scoreModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center">
+    <div class="bg-white rounded-lg shadow-lg p-6 text-center max-w-sm w-full">
+      <h2 class="text-xl font-bold text-gray-800 mb-2">🎉 Kuis Selesai!</h2>
+      <p class="text-gray-700 mb-4" id="scoreText">Skor kamu: 0</p>
+      <button id="retryBtn" class="bg-yellow-600 text-white px-4 py-2 rounded">Coba Lagi</button>
+    </div>
   </div>
 
   <script type="module">
+    // Import Firebase modular
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-    import { getDatabase, ref, set, get, onValue, update, runTransaction } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+    import { getDatabase, ref, set, get, update, onValue, runTransaction } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-analytics.js";
 
+    // 🔥 Konfigurasi Firebase kamu
     const firebaseConfig = {
       apiKey: "AIzaSyAfHIXrnD9iFZx03ASospR-INapp6ImjUM",
       authDomain: "balap-50624.firebaseapp.com",
@@ -61,234 +58,134 @@
       measurementId: "G-4NT9V14N92"
     };
 
+    // Inisialisasi Firebase
     const app = initializeApp(firebaseConfig);
+    const analytics = getAnalytics(app);
     const db = getDatabase(app);
 
-    const appEl = document.getElementById("app");
-    const btnCreate = document.getElementById("btnCreate");
-
-    let isHost = false;
-    let roomId = new URLSearchParams(window.location.search).get("room");
-    let playerId = Math.random().toString(36).slice(2, 9);
-    let playerName = "";
-    const MAX_PLAYERS = 5;
-    const QUESTIONS_PER_GAME = 5; // 🔸 ubah jadi maksimal 5 soal
+    // 🧩 Konstanta permainan
+    const QUESTIONS_PER_GAME = 5;
     const POINTS_PER_CORRECT = 1;
 
-    function replaceLucide() { if (window.lucide) window.lucide.replace(); }
-    function makeRoomId() { return Math.random().toString(36).slice(2,8); }
+    let playerId = "player_" + Math.floor(Math.random() * 9999);
+    let roomId = "room1";
+
+    // 🧮 Fungsi buat soal acak
     function genQuestion() {
-      const a = Math.floor(Math.random() * 10);
-      const b = Math.floor(Math.random() * 10);
-      return { q: `${a} + ${b} = ?`, a: a + b, seed: Date.now() };
+      const a = Math.floor(Math.random() * 9) + 1;
+      const b = Math.floor(Math.random() * 9) + 1;
+      return { q: `${a} + ${b} = ?`, a: a + b };
     }
 
+    // 🚗 Konversi skor ke posisi mobil (kanan ke kiri)
     function scoreToPercent(score) {
       const max = QUESTIONS_PER_GAME;
       const pct = Math.min(92, Math.round((score / max) * 92));
-      return pct + "%";
+      return (92 - pct) + "%"; // makin besar skor, makin ke kiri
     }
 
-    // Landing
-    function renderLanding() {
-      appEl.innerHTML = `
-        <div class="grid md:grid-cols-2 gap-6">
-          <div class="p-4">
-            <h2 class="text-lg font-semibold text-gray-800 mb-2">Masuk Room</h2>
-            <label class="text-sm text-gray-700">Room ID atau link</label>
-            <input id="inputRoom" class="mt-1 p-2 border rounded w-full text-gray-800" placeholder="contoh: ab12cd" value="${roomId || ''}" />
-            <label class="text-sm text-gray-700 mt-3 block">Nama Kamu</label>
-            <input id="inputName" class="mt-1 p-2 border rounded w-full text-gray-800" placeholder="Tulis nama (contoh: Siti)" />
-            <div class="flex gap-2 mt-4">
-              <button id="joinBtn" class="flex-1 bg-yellow-600 text-white rounded px-4 py-2 font-semibold">Gabung Pemain</button>
-              <button id="hostBtn" class="flex-1 bg-white text-yellow-600 border border-yellow-600 rounded px-4 py-2 font-semibold">Jadi Admin</button>
-            </div>
-            <p class="text-xs text-gray-500 mt-3">Maksimal 5 pemain per room.</p>
-          </div>
-          <div class="p-4 bg-yellow-50 rounded">
-            <h3 class="text-md font-semibold text-gray-800 mb-2">Cara main</h3>
-            <ol class="list-decimal list-inside text-gray-700 text-sm space-y-1">
-              <li>Buat room, bagikan link ke teman.</li>
-              <li>Jawab soal dengan benar untuk maju.</li>
-              <li>Siapa paling cepat sampai akhir menang!</li>
-            </ol>
-          </div>
-        </div>
-      `;
-      replaceLucide();
-      document.getElementById("joinBtn").onclick = joinAsPlayer;
-      document.getElementById("hostBtn").onclick = createRoomAsHost;
-    }
-
-    function renderRoomWaiting(roomSnapshot) {
-      const room = roomSnapshot || {};
-      const players = room.players || {};
-      const host = room.host || { name: "(admin)" };
-
-      const playerListHTML = Object.entries(players).map(([id, p]) => `
-        <div class="flex items-center justify-between p-2 border-b">
-          <div class="flex items-center gap-3">
-            <svg data-lucide="user" width="18" height="18"></svg>
-            <div>
-              <div class="text-sm font-medium text-gray-800">${p.name}</div>
-              <div class="text-xs text-gray-500">Skor: ${p.score || 0}</div>
-            </div>
-          </div>
-        </div>
-      `).join("") || '<div class="text-sm text-gray-500 p-3">Belum ada pemain.</div>';
-
-      appEl.innerHTML = `
-        <div class="space-y-4">
-          <h2 class="text-lg font-semibold text-gray-800">Room: <span class="font-mono text-yellow-600">${roomId}</span></h2>
-          <div class="p-2 bg-white rounded shadow-sm">
-            <div class="text-sm text-gray-600 mb-2">Pemain (maks ${MAX_PLAYERS})</div>
-            <div class="border rounded overflow-hidden">${playerListHTML}</div>
-          </div>
-          <div class="flex justify-end gap-2">
-            ${isHost ? '<button id="startBtn" class="bg-yellow-600 text-white px-4 py-2 rounded font-semibold">Mulai Game</button>' : ''}
-          </div>
-        </div>
-      `;
-      replaceLucide();
-      if (isHost) document.getElementById("startBtn").onclick = startGameAsHost;
-    }
-
-    // 🔸 ubah ikon mobil pakai emoji Omoji
-    function renderGameView(room) {
-      const players = room.players || {};
-      appEl.innerHTML = `
-        <div class="space-y-4">
-          <div class="flex justify-between items-center">
-            <h2 class="text-lg font-semibold text-gray-800">Room: ${roomId}</h2>
-            <div class="text-sm text-gray-700">Soal: <span id="currentQ"></span></div>
-          </div>
-
-          <div class="p-4 bg-white rounded track">
-            ${Object.entries(players).map(([id, p]) => `
-              <div class="mb-3 car-wrap" data-player-id="${id}">
-                <div class="flex items-center justify-between mb-2">
-                  <div class="text-sm font-medium text-gray-800">${p.name}</div>
-                  <div class="text-sm text-gray-600">Skor: <span>${p.score||0}</span></div>
-                </div>
-                <div class="relative h-12 bg-gray-100 rounded">
-                  <div class="car-icon" style="left:${scoreToPercent(p.score||0)}">🚗💨</div>
-                </div>
-              </div>
-            `).join('')}
-          </div>
-
-          <div class="grid md:grid-cols-3 gap-4">
-            <div class="md:col-span-2 bg-white p-4 rounded" id="actionArea"></div>
-            <div class="bg-white p-4 rounded">
-              <h3 class="text-sm font-semibold text-gray-800 mb-2">Papan Skor</h3>
-              <div id="leaderboard" class="text-sm space-y-2"></div>
-            </div>
-          </div>
-        </div>
-      `;
-      replaceLucide();
-      document.getElementById("currentQ").textContent = room.currentQuestion?.q || "-";
-      const actionEl = document.getElementById("actionArea");
-
-      if (isHost) {
-        actionEl.innerHTML = `
-          <h3 class="text-sm font-semibold mb-2">Panel Admin</h3>
-          <button id="nextQBtn" class="bg-yellow-600 text-white px-3 py-2 rounded">Soal Baru</button>
-          <button id="endBtn" class="bg-white border px-3 py-2 rounded ml-2">Akhiri Game</button>
-        `;
-        document.getElementById("nextQBtn").onclick = async () => {
-          const nq = genQuestion();
-          await set(ref(db, `rooms/${roomId}/currentQuestion`), nq);
-        };
-        document.getElementById("endBtn").onclick = async () => {
-          await update(ref(db, `rooms/${roomId}`), { started: false });
-        };
-      } else {
-        actionEl.innerHTML = `
-          <h3 class="text-sm font-semibold mb-2">Jawab Soal</h3>
-          <input id="answerInput" class="p-2 border rounded w-full mb-2" placeholder="ketik angka" />
-          <button id="sendAnswer" class="bg-yellow-600 text-white px-4 py-2 rounded">Kirim</button>
-        `;
-        document.getElementById("sendAnswer").onclick = submitAnswer;
-      }
-
-      updateLeaderboard(players);
-    }
-
-    function updateLeaderboard(players) {
-      const lb = Object.entries(players || {}).sort((a,b)=> (b[1].score||0)-(a[1].score||0));
-      const el = document.getElementById("leaderboard");
-      if (!el) return;
-      el.innerHTML = lb.map(([id,p], idx)=>`
-        <div class="flex justify-between ${id===playerId?'text-yellow-600 font-semibold':''}">
-          <div>${idx+1}. ${p.name}</div><div>${p.score||0}</div>
-        </div>
-      `).join('');
-    }
-
-    async function createRoomAsHost() {
-      const nameInput = document.getElementById("inputName").value.trim();
-      if (!nameInput) return alert("Isi nama admin dulu.");
-      playerName = nameInput;
-      isHost = true;
-      roomId = makeRoomId();
-      await set(ref(db, `rooms/${roomId}`), { host: { id: playerId, name: playerName }, started: false, players: {} });
-      history.replaceState(null, '', '?room=' + roomId);
-      listenRoom(roomId);
-    }
-
-    async function joinAsPlayer() {
-      const nameInput = document.getElementById("inputName").value.trim();
-      const roomInput = (document.getElementById("inputRoom").value || '').trim();
-      if (!nameInput) return alert("Isi nama dulu.");
-      playerName = nameInput;
-      roomId = roomInput || roomId;
-      const snap = await get(ref(db, `rooms/${roomId}`));
-      if (!snap.exists()) return alert("Room ID tidak ditemukan.");
-      const room = snap.val();
-      if (Object.keys(room.players||{}).length >= MAX_PLAYERS) return alert("Room penuh (maks 5).");
-      await update(ref(db, `rooms/${roomId}/players/${playerId}`), { name: playerName, score: 0 });
-      history.replaceState(null, '', '?room=' + roomId);
-      listenRoom(roomId);
-    }
-
-    async function startGameAsHost() {
+    // 🚗 Render semua mobil di lintasan
+    async function renderTrack() {
       const snap = await get(ref(db, `rooms/${roomId}/players`));
-      if (!snap.exists() || Object.keys(snap.val()).length < 1) return alert("Minimal 1 pemain.");
-      const initialQ = genQuestion();
-      await update(ref(db, `rooms/${roomId}`), { started: true, currentQuestion: initialQ, questionIndex: 0 });
+      const track = document.getElementById("track");
+      track.innerHTML = "";
+
+      if (snap.exists()) {
+        const players = snap.val();
+        Object.entries(players).forEach(([id, p]) => {
+          const car = document.createElement("div");
+          car.className = "car-icon";
+          car.style.right = scoreToPercent(p.score || 0);
+          car.textContent = "🚗💨";
+          track.appendChild(car);
+        });
+      }
     }
 
+    // 🎲 Tampilkan soal sekarang
+    async function showQuestion() {
+      const qSnap = await get(ref(db, `rooms/${roomId}/currentQuestion`));
+      if (qSnap.exists()) {
+        document.getElementById("questionText").textContent = qSnap.val().q;
+      }
+    }
+
+    // 🚀 Submit jawaban pemain
     async function submitAnswer() {
       const val = document.getElementById("answerInput").value.trim();
-      if (val === "") return alert("Masukkan jawaban.");
+      if (val === "") return alert("Masukkan jawaban!");
       const qSnap = await get(ref(db, `rooms/${roomId}/currentQuestion`));
       if (!qSnap.exists()) return;
+
       const current = qSnap.val();
       const numeric = Number(val);
+      const playerRef = ref(db, `rooms/${roomId}/players/${playerId}`);
+
       if (numeric === current.a) {
-        const playerScoreRef = ref(db, `rooms/${roomId}/players/${playerId}/score`);
-        await runTransaction(playerScoreRef, (cur) => (cur || 0) + POINTS_PER_CORRECT);
+        await runTransaction(ref(db, `${playerRef.path.pieces_.join('/')}/score`), (cur) => (cur || 0) + POINTS_PER_CORRECT);
+        await runTransaction(ref(db, `${playerRef.path.pieces_.join('/')}/questionIndex`), (cur) => (cur || 0) + 1);
+
+        const playerSnap = await get(playerRef);
+        const playerData = playerSnap.val();
+
+        if (playerData.questionIndex >= QUESTIONS_PER_GAME) {
+          showScoreModal(playerData.score);
+          return;
+        }
+
         const nq = genQuestion();
         await set(ref(db, `rooms/${roomId}/currentQuestion`), nq);
-      } else alert("Salah, coba lagi!");
-      document.getElementById("answerInput").value = '';
+      } else {
+        alert("Salah, coba lagi!");
+      }
+
+      document.getElementById("answerInput").value = "";
     }
 
-    function listenRoom(rid) {
-      onValue(ref(db, `rooms/${rid}`), (snap) => {
-        const data = snap.val();
-        if (!data) { alert('Room dihapus.'); renderLanding(); return; }
-        if (data.host && data.host.id === playerId) isHost = true;
-        if (!data.started) renderRoomWaiting(data);
-        else renderGameView(data);
+    // 🪟 Tampilkan popup skor
+    function showScoreModal(score) {
+      const modal = document.getElementById("scoreModal");
+      document.getElementById("scoreText").textContent = `Skor kamu: ${score}/${QUESTIONS_PER_GAME}`;
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");
+
+      document.getElementById("retryBtn").onclick = async () => {
+        await update(ref(db, `rooms/${roomId}/players/${playerId}`), {
+          score: 0,
+          questionIndex: 0
+        });
+        modal.classList.add("hidden");
+
+        const nq = genQuestion();
+        await set(ref(db, `rooms/${roomId}/currentQuestion`), nq);
+      };
+    }
+
+    // 🚦 Inisialisasi game
+    async function init() {
+      // Batasi max 5 pemain
+      const playersSnap = await get(ref(db, `rooms/${roomId}/players`));
+      if (playersSnap.exists() && Object.keys(playersSnap.val()).length >= 5) {
+        alert("Room sudah penuh (maksimal 5 pemain)");
+        return;
+      }
+
+      await set(ref(db, `rooms/${roomId}/players/${playerId}`), {
+        name: playerId,
+        score: 0,
+        questionIndex: 0
       });
+
+      const nq = genQuestion();
+      await set(ref(db, `rooms/${roomId}/currentQuestion`), nq);
+
+      onValue(ref(db, `rooms/${roomId}/players`), renderTrack);
+      onValue(ref(db, `rooms/${roomId}/currentQuestion`), showQuestion);
     }
 
-    btnCreate.onclick = renderLanding;
-    renderLanding();
-    if (roomId) setTimeout(()=>{document.getElementById('inputRoom').value = roomId;},50);
-    setTimeout(()=>replaceLucide(),200);
+    // Tombol event
+    document.getElementById("submitBtn").addEventListener("click", submitAnswer);
+    init();
   </script>
 </body>
 </html>
