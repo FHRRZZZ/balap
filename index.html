@@ -7,22 +7,33 @@
 
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <style>
-    .track { background: #f3f4f6; border-radius: 8px; }
-    .car-wrap { position: relative; height: 56px; }
-    .car-icon { 
-      position: absolute; 
-      top: 50%; 
-      transform: translateY(-50%); 
-      transition: right 600ms ease; 
-      font-size: 28px;
-    }
-    .card { background: white; border-radius: 12px; box-shadow: 0 6px 18px rgba(0,0,0,0.08); }
-    #scoreModal {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.4);
-      display: none; align-items: center; justify-content: center; z-index: 50;
-    }
-  </style>
+<style>
+  .track {
+    background: #f3f4f6;
+    border-radius: 8px;
+    height: 36px;
+    position: relative;
+    overflow: hidden;
+  }
+  .car-wrap { margin-bottom: 12px; }
+  .car-line {
+    position: relative;
+  }
+  .car-icon {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    transition: right 600ms ease;
+    font-size: 28px;
+    line-height: 1;
+  }
+  .player-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 4px;
+  }
+</style>
 </head>
 <body class="bg-yellow-50 min-h-screen flex items-center justify-center p-6">
 
@@ -146,14 +157,13 @@
       </div>
       <div class="bg-white rounded p-3 mb-4">
         ${Object.entries(players).map(([id,p])=>`
-          <div class="car-wrap mb-3">
-            <div class="flex justify-between text-sm mb-1">
-              <div>${p.name}</div><div>Skor: ${p.score||0}</div>
+            <div class="car-wrap">
+                <div class="player-name">${p.name} — Skor: ${p.score||0}</div>
+                <div class="track">
+                <div class="car-icon" style="right:${scoreToPercent(p.score||0)}">🚗💨</div>
+                </div>
             </div>
-            <div class="relative track h-10 rounded">
-              <div class="car-icon" style="right:${scoreToPercent(p.score||0)}">🚗💨</div>
-            </div>
-          </div>`).join('')}
+        `).join('')}
       </div>
       ${!isHost?`
       <div class="bg-white p-3 rounded">
